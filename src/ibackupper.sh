@@ -51,10 +51,10 @@ write_log()
 
 do_backup()
 {
-    cmd=$1
+    cmd="$1"
     for i in $(seq 1 3)
     do
-        $cmd 2>&1
+        "$cmd" 2>&1
         ret=$?
         if [ "$ret" -eq 0 ]; then break; fi
         write_log WARNING "rsync returned non zero exit code - $ret.! Retrying.."
@@ -128,7 +128,7 @@ then
     for i in "${!src[@]}"
     do
         # Source check
-        if [ ! -d "${i}" ]; then continue; fi
+        if [ ! -d "${src[$i]}" ]; then continue; fi
 
         # Check excludes
         excludes=' '
@@ -153,7 +153,7 @@ then
         fi
 
         # Complete command
-        cmd="rsync -aHAXRch --timeout=300 --delete --stats --numeric-ids -M--fake-super --port=${ssh_port} $link_dest ${excludes} ${src[$i]} ${hostname}@${backup_server}:${r_basedir}/${r_backup_dir}/"
+        cmd="rsync -aHAXRch --timeout=300 --delete --stats --numeric-ids -M--fake-super -e 'ssh -p${ssh_port}' $link_dest ${excludes} ${src[$i]} ${hostname}@${backup_server}:${r_basedir}/${r_backup_dir}/"
         write_log INFO "Command: ${cmd}"
 
         # Do backup
@@ -181,10 +181,10 @@ fi
 ### Move compressed logs ###
 if [ "$logs" -eq 1 ]
 then
-    source='/var/log'
+    source='/var/temp'
     includes='--include="*/" --include="*.gz" --include="*.bz2"'
     excludes='--exclude="*"'
-    cmd="rsync -aHAXRch --remove-source-files --timeout=300 --stats --numeric-ids -M--fake-super --port=${ssh_port} ${includes} ${excludes} ${source} ${hostname}@${backup_server}:${r_basedir}/${r_backup_dir}/"
+    cmd="rsync -aHAXRch --remove-source-files --timeout=300 --stats --numeric-ids -M--fake-super -e 'ssh -p${ssh_port}' ${includes} ${excludes} ${source} ${hostname}@${backup_server}:${r_basedir}/${r_backup_dir}/"
 
     # Do backup
     write_log INFO "Making ${source} backup. rsync log follows:"
