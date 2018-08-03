@@ -2,7 +2,7 @@
 #
 # ibackupper.sh
 # Copyright 2018 by Marko Punnar <marko[AT]aretaja.org>
-# Version: 1.1
+# Version: 1.2
 #
 # Script to make incremental, SQL and file backups of your data to remote
 # target. Requires bash, rsync and cat on both ends and ssh key login without
@@ -26,6 +26,7 @@
 # 1.1 Change ssh port declaration to support older rsync.
 #     Fix incremental source check.
 #     Fix symlink creation command.
+# 1.2 Fix rsync command execution
 
 # show help if requested or no args
 if [ "$1" = '-h' ] || [ "$1" = '--help' ]
@@ -57,7 +58,7 @@ do_backup()
     cmd="$1"
     for i in $(seq 1 3)
     do
-        "$cmd" 2>&1
+        eval $cmd 2>&1
         ret=$?
         if [ "$ret" -eq 0 ]; then break; fi
         write_log WARNING "rsync returned non zero exit code - $ret.! Retrying.."
