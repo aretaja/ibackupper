@@ -1,0 +1,48 @@
+hostname=mysrchost              # username on backup server
+backup_server=mydsthost.domain  # backup server FQDN or IP
+ssh_port=22                     # backup server ssh port
+r_basedir=archives              # servers basedir for backups
+
+# Define backup sources and exclude patterns. Exclude pattern (exc) is
+# optional but index must match source (src) index. Exclude patterns must be
+# separated bu comma. Directory will be skipped if not exists.
+src[0]='/home'
+exc[0]='*/tmp,*/temp,*/Downloads,*/.cache'
+src[1]='/etc'
+exc[1]=''
+src[2]='/usr/local'
+exc[2]=''
+src[3]='/opt'
+exc[3]=''
+src[4]='/var/spool/mail'
+exc[4]=''
+src[5]='/var/spool/cron'
+exc[5]=''
+src[6]='/var/www/'
+exc[6]=''
+
+# Move compressed (*.gz|*.bz2) old logs from /var/log to backup server
+
+logs=1 # (0|1)X
+
+# Backup mysql/mariadb DB-s
+mysql=1 # (0|1)
+
+# list of DB-s to ignore separated by "|"
+m_ignore_db="information_schema|performance_schema"
+
+# root user must have "mysqldump" and "mysqlshow" sections defined in .my.cnf
+# file like this:
+# [mysqldump]
+# user=your_backup_user
+# password=your_pass
+#
+# [mysqlshow]
+# user=your_backup_user
+# password=your_pass
+
+# Backup postgresql DB-s
+postgresql=1 # (0|1)
+
+# list of DB-s to ignore separated by "|"
+p_ignore_db=""
