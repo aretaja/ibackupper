@@ -2,7 +2,7 @@
 #
 # ibackupper.sh
 # Copyright 2018 by Marko Punnar <marko[AT]aretaja.org>
-# Version: 1.0
+# Version: 1.1
 #
 # Script to make incremental, SQL and file backups of your data to remote
 # target. Requires bash, rsync and cat on both ends and ssh key login without
@@ -22,7 +22,10 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>
 #
 # Changelog:
-# 1.0 initial release
+# 1.0 Initial release
+# 1.1 Change ssh port declaration to support older rsync.
+#     Fix incremental source check.
+#     Fix symlink creation command.
 
 # show help if requested or no args
 if [ "$1" = '-h' ] || [ "$1" = '--help' ]
@@ -181,7 +184,7 @@ fi
 ### Move compressed logs ###
 if [ "$logs" -eq 1 ]
 then
-    source='/var/temp'
+    source='/var/log'
     includes='--include="*/" --include="*.gz" --include="*.bz2"'
     excludes='--exclude="*"'
     cmd="rsync -aHAXRch --remove-source-files --timeout=300 --stats --numeric-ids -M--fake-super -e 'ssh -p${ssh_port}' ${includes} ${excludes} ${source} ${hostname}@${backup_server}:${r_basedir}/${r_backup_dir}/"
