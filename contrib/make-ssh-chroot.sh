@@ -2,10 +2,10 @@
 #
 # make-ssh-chroot.sh
 # Copyright 2018 by Marko Punnar <marko[AT]aretaja.org>
-# Version: 1.1
+# Version: 1.2
 #
 # Creates or updates minimal ibackuper compatible chroot environment in user
-# homedir. Chroot contains bash, rsync and cat.
+# homedir. Chroot contains bash, cat, tar, gzip and rsync.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -25,6 +25,8 @@
 # 1.1 Change only user for all files in user chroot.
 #     Chmod 0700 user chrooted homedir.
 #     Fix symlink creation command.
+# 1.2 Include tar and gzip in chroot.
+#     Code optimizations
 
 # show help if requested or no args
 if [ $# -eq 0 ] || [ "$1" = '-h' ] || [ "$1" = '--help' ]
@@ -56,7 +58,7 @@ fi
 
 # extract homedir and shell
 homedir=$(echo "$userinf" |cut -d ':' -f6)
-shell=$(echo "$userinf" |cut -d ':' -f7)
+binaries[0]=$(echo "$userinf" |cut -d ':' -f7)
 
 if [ ! -d "$homedir" ]
 then
@@ -75,21 +77,18 @@ then
     exit 1
 fi
 
-# check if cat installed
-cat=$(which cat)
-if [ -z "$cat" ]
-then
-    echo "[ERROR] cat is not installed! Interrupting.." 1>&2
-    exit 1
-fi
-
-# check if rsync installed
-rsync=$(which rsync)
-if [ -z "$rsync" ]
-then
-    echo "[ERROR] rsync is not installed! Interrupting.." 1>&2
-    exit 1
-fi
+# check if required binaries are installed and save their full path if true
+cnt=1
+for b in 'cat' 'tar' 'gzip' 'rsync'
+do
+    binaries[$cnt]=$(which "$b")
+    if [ -z "${binaries[$cnt]}" ]
+    then
+        echo "[ERROR] $b is not installed! Interrupting.." 1>&2
+        exit 1
+    fi
+    (( cnt++ ))
+done
 
 # create chroot
 mkdir -p dev bin usr/bin "$chhomedir/archives"
@@ -102,13 +101,14 @@ mknod -m 666 dev/tty c 5 0
 mknod -m 666 dev/zero c 1 5
 mknod -m 666 dev/random c 1 8
 
-
-cp -v "$shell" "$(dirname "$shell" |sed 's/^.//')/"
-cp -v "$cat" "$(dirname "$rsync" |sed 's/^.//')/"
-cp -v "$rsync" "$(dirname "$rsync" |sed 's/^.//')/"
+# copy binaries
+for b in "${binaries[@]}"
+do
+    cp -v "$b" "$(dirname "$b" |sed 's/^.//')/"
+done
 
 # find and copy required libraries
-for b in "$shell" "$cat" "$rsync"
+for b in "${binaries[@]}"
 do
     for l in $(ldd "$b" |grep -P '\s/' |sed 's/^.*\s\(\/.*\)\s.*/\1/')
     do
