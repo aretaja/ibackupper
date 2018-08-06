@@ -284,7 +284,7 @@ if [ "$full_backup" -eq 1 ] && [ "$last_ok_full" != "$month_nr" ]
 then
     write_log INFO "Making full monthly backup. Console log follows:"
     # shellcheck disable=SC2029
-    ssh -o BatchMode=yes -p"${ssh_port}" -l"${hostname}" "${backup_server}" "tar -C \"${r_basedir}\" -cf - \"${r_backup_dir} | gzip -c >\"${r_basedir}/fullbackup_month_${month_nr}.tgz\""
+    ssh -o BatchMode=yes -p"${ssh_port}" -l"${hostname}" "${backup_server}" "tar -C \"${r_basedir}\" -cf - \"${r_backup_dir}\" | gzip -c >\"${r_basedir}/fullbackup_month_${month_nr}.tgz\""
 
     if [ "$?" -ne 0 ]
     then
