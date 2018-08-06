@@ -2,7 +2,7 @@
 #
 # make-ssh-chroot.sh
 # Copyright 2018 by Marko Punnar <marko[AT]aretaja.org>
-# Version: 1.2
+# Version: 1.3
 #
 # Creates or updates minimal ibackuper compatible chroot environment in user
 # homedir. Chroot contains bash, cat, tar, gzip and rsync.
@@ -27,6 +27,7 @@
 #     Fix symlink creation command.
 # 1.2 Include tar and gzip in chroot.
 #     Code optimizations
+# 1.3 Make shure homedir permissions are correct.
 
 # show help if requested or no args
 if [ $# -eq 0 ] || [ "$1" = '-h' ] || [ "$1" = '--help' ]
@@ -95,6 +96,7 @@ mkdir -p dev bin usr/bin "$chhomedir/archives"
 ln -s "$chhomedir/archives" archives
 chown -R "${user}" ./*
 chown root:root "$homedir"
+chmod 0755 "$homedir"
 chmod 0700 "$chhomedir"
 mknod -m 666 dev/null c 1 3
 mknod -m 666 dev/tty c 5 0
