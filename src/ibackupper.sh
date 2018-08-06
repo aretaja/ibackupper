@@ -2,7 +2,7 @@
 #
 # ibackupper.sh
 # Copyright 2018 by Marko Punnar <marko[AT]aretaja.org>
-# Version: 1.2
+# Version: 1.3
 #
 # Script to make incremental, SQL and file backups of your data to remote
 # target. Requires bash, rsync and cat on both ends and ssh key login without
@@ -26,7 +26,8 @@
 # 1.1 Change ssh port declaration to support older rsync.
 #     Fix incremental source check.
 #     Fix symlink creation command.
-# 1.2 Fix rsync command execution
+# 1.2 Fix rsync command execution.
+# 1.3 Make monthly full backups for 12 months.
 
 # show help if requested or no args
 if [ "$1" = '-h' ] || [ "$1" = '--help' ]
@@ -58,7 +59,7 @@ do_backup()
     cmd="$1"
     for i in $(seq 1 3)
     do
-        eval $cmd 2>&1
+        eval "$cmd" 2>&1
         ret=$?
         if [ "$ret" -eq 0 ]; then break; fi
         write_log WARNING "rsync returned non zero exit code - $ret.! Retrying.."
@@ -157,7 +158,7 @@ then
         fi
 
         # Complete command
-        cmd="rsync -aHAXRch --timeout=300 --delete --stats --numeric-ids -M--fake-super -e 'ssh -p${ssh_port}' $link_dest ${excludes} ${src[$i]} ${hostname}@${backup_server}:${r_basedir}/${r_backup_dir}/"
+        cmd="rsync -aHAXRch --timeout=300 --delete --stats --numeric-ids -M--fake-super -e 'ssh -o BatchMode=yes -p${ssh_port}' $link_dest ${excludes} ${src[$i]} ${hostname}@${backup_server}:${r_basedir}/${r_backup_dir}/"
         write_log INFO "Command: ${cmd}"
 
         # Do backup
@@ -172,7 +173,7 @@ fi
 echo "last_backup=${r_backup_dir}" > "${ahome}/last_data"
 if [ $errors -eq 0 ]
 then
-    echo "last_ok_inc_backup=${r_backup_dir}" > "${ahome}/last_data"
+    echo "last_ok_inc_backup=${r_backup_dir}" >> "${ahome}/last_data"
     echo "last_inc_status=ok" >> "${ahome}/last_data"
     write_log INFO "Incremental backup done"
 else
@@ -188,7 +189,7 @@ then
     source='/var/log'
     includes='--include="*/" --include="*.gz" --include="*.bz2"'
     excludes='--exclude="*"'
-    cmd="rsync -aHAXRch --remove-source-files --timeout=300 --stats --numeric-ids -M--fake-super -e 'ssh -p${ssh_port}' ${includes} ${excludes} ${source} ${hostname}@${backup_server}:${r_basedir}/${r_backup_dir}/"
+    cmd="rsync -aHAXRh --remove-source-files --timeout=300 --stats --numeric-ids -M--fake-super -e 'ssh -o BatchMode=yes -p${ssh_port}' ${includes} ${excludes} ${source} ${hostname}@${backup_server}:${r_basedir}/${r_backup_dir}/"
 
     # Do backup
     write_log INFO "Making ${source} backup. rsync log follows:"
@@ -220,7 +221,7 @@ then
     do
         write_log INFO "Transferring $d dump to $backup_server over ssh pipe. Console log follows:"
         # shellcheck disable=SC2029
-        mysqldump --single-transaction --events --triggers --add-drop-database --flush-logs "$d" | gzip -c - | ssh -p"${ssh_port}" -l"${hostname}" "${backup_server}" "cat > \"${r_basedir}/${r_backup_dir}/mysql_db_${d}.sql.gz\""
+        mysqldump --single-transaction --events --triggers --add-drop-database --flush-logs "$d" | gzip -c - | ssh -o BatchMode=yes -p"${ssh_port}" -l"${hostname}" "${backup_server}" "cat > \"${r_basedir}/${r_backup_dir}/mysql_db_${d}.sql.gz\""
 
         if [ "$?" -ne 0 ]
         then
@@ -254,7 +255,7 @@ then
     do
         write_log INFO "Transferring $d dump to $backup_server over ssh pipe. Console log follows:"
         # shellcheck disable=SC2029
-        sudo -u postgres pg_dump "$d" | gzip -c - | ssh -p"${ssh_port}" -l"${hostname}" "${backup_server}" "cat > \"${r_basedir}/${r_backup_dir}/postgresql_db_${d}.sql.gz\""
+        sudo -u postgres pg_dump "$d" | gzip -c - | ssh -o BatchMode=yes -p"${ssh_port}" -l"${hostname}" "${backup_server}" "cat > \"${r_basedir}/${r_backup_dir}/postgresql_db_${d}.sql.gz\""
 
         if [ "$?" -ne 0 ]
         then
@@ -275,5 +276,30 @@ then
     fi
 fi
 ### End of DB backup ###
+
+### Full backup ###
+month_nr=$(date +%m)
+# shellcheck disable=SC2154
+if [ "$full_backup" -eq 1 ] && [ "$last_ok_full" != "$month_nr" ]
+then
+    write_log INFO "Making full monthly backup. Console log follows:"
+    # shellcheck disable=SC2029
+    ssh -o BatchMode=yes -p"${ssh_port}" -l"${hostname}" "${backup_server}" "tar -C \"${r_basedir}\" -cf - \"${r_backup_dir} | gzip -c >\"${r_basedir}/fullbackup_month_${month_nr}.tgz\""
+
+    if [ "$?" -ne 0 ]
+    then
+        write_log ERROR "Something went wrong with monthly full backup!"
+        echo "last_ok_full=${last_ok_full}" >> "${ahome}/last_data"
+        echo "last_full_status=errors" >> "${ahome}/last_data"
+    else
+        write_log INFO "Full backup done"
+        echo "last_ok_full=${month_nr}" >> "${ahome}/last_data"
+        echo "last_full_status=ok" >> "${ahome}/last_data"
+    fi
+else
+    write_log INFO "Full backup for this month already exists."
+    echo "last_ok_full=${last_ok_full}" >> "${ahome}/last_data"
+fi
+### End of full backup ###
 
 exit

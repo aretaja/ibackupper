@@ -23,10 +23,10 @@ exc[6]=''
 
 # Move compressed (*.gz|*.bz2) old logs from /var/log to backup server
 
-logs=1 # (0|1)X
+logs=0 # (0|1)X
 
 # Backup mysql/mariadb DB-s
-mysql=1 # (0|1)
+mysql=0 # (0|1)
 
 # list of DB-s to ignore separated by "|"
 m_ignore_db="information_schema|performance_schema"
@@ -42,7 +42,10 @@ m_ignore_db="information_schema|performance_schema"
 # password=your_pass
 
 # Backup postgresql DB-s
-postgresql=1 # (0|1)
+postgresql=0 # (0|1)
 
 # list of DB-s to ignore separated by "|"
 p_ignore_db=""
+
+# Make monthly full backups. Will be made if
+full_backup=0 # (0|1)
