@@ -47,5 +47,8 @@ postgresql=0 # (0|1)
 # list of DB-s to ignore separated by "|"
 p_ignore_db=""
 
-# Make monthly full backups. Will be made if
+# Make monthly full backups.
 full_backup=0 # (0|1)
+
+# How many full monthly backups to keep
+full_cnt=12 # 0-12

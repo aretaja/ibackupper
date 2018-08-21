@@ -2,7 +2,7 @@
 #
 # ibackupper.sh
 # Copyright 2018 by Marko Punnar <marko[AT]aretaja.org>
-# Version: 1.3
+# Version: 1.4
 #
 # Script to make incremental, SQL and file backups of your data to remote
 # target. Requires bash, rsync and cat on both ends and ssh key login without
@@ -28,6 +28,7 @@
 #     Fix symlink creation command.
 # 1.2 Fix rsync command execution.
 # 1.3 Make monthly full backups for 12 months.
+# 1.4 Allow limiting full backups count.
 
 # show help if requested or no args
 if [ "$1" = '-h' ] || [ "$1" = '--help' ]
@@ -282,6 +283,24 @@ month_nr=$(date +%m)
 # shellcheck disable=SC2154
 if [ "$full_backup" -eq 1 ] && [ "$last_ok_full" != "$month_nr" ]
 then
+    # Keep only requested count of full monthly backups. Truncate the rest.
+    if [ "$full_cnt" -ge 1 ] && [ "$full_cnt" -le 12 ]
+    then
+        write_log INFO "Truncate superfluous monthly backups. Console log follows:"
+        for m in $(seq 0 11)
+        do
+            m_nr=$(date -d "-${m} month" +%m)
+            filename="fullbackup_month_${m_nr}.tgz"
+            if [ $full_cnt -le 0 ]
+            then
+                null="${null}: >$filename && "
+            fi
+            ((full_cnt--))
+        done
+        null="${null}true"
+        # shellcheck disable=SC2029
+        ssh -o BatchMode=yes -p"${ssh_port}" -l"${hostname}" "${backup_server}" "eval \"$null\""
+    fi
     write_log INFO "Making full monthly backup. Console log follows:"
     # shellcheck disable=SC2029
     ssh -o BatchMode=yes -p"${ssh_port}" -l"${hostname}" "${backup_server}" "tar -C \"${r_basedir}\" -cf - \"${r_backup_dir}\" | gzip -c >\"${r_basedir}/fullbackup_month_${month_nr}.tgz\""
