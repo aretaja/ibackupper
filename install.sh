@@ -31,9 +31,10 @@ fi
 
 echo '[INFO] Set owner and permissions.'
 chown -vR root:root "$destination"
-chmod 0700 -v "$destination"
-find "$destination" -type f ! -name "*.sh" -exec chmod -v 0600 '{}' \;
-find "$destination" -type f -name "*.sh" -exec chmod -v 0700 '{}' \;
+chmod 0755 -v "$destination"
+find "$destination" -type f ! \( -name "*.sh" -o -name "*.conf" \) -exec chmod -v 0644 '{}' \;
+chmod -v 0700 "${destination}/ibackupper.sh"
+chmod -v 0600 "${destination}/ibackupper.conf"
 
 echo '[INFO] Done'
 echo "[INFO] Setup Your config in ${destination}/ibackupper.conf."
