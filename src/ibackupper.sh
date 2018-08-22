@@ -178,6 +178,11 @@ then
     echo "last_inc_status=ok" >> "${ahome}/last_data"
     write_log INFO "Incremental backup done"
 else
+    # shellcheck disable=SC2154
+    if [ ! -z "${last_ok_inc_backup+x}" ]
+    then
+        echo "last_ok_inc_backup=${last_ok_inc_backup}" >> "${ahome}/last_data"
+    fi
     echo "last_inc_status=errors" >> "${ahome}/last_data"
     write_log WARNING "Incremental backup had errors"
     errors=0
