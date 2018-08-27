@@ -2,7 +2,7 @@
 #
 # ibackupper.sh
 # Copyright 2018 by Marko Punnar <marko[AT]aretaja.org>
-# Version: 1.5
+# Version: 1.6
 #
 # Script to make incremental, SQL and file backups of your data to remote
 # target. Requires bash, rsync and cat on both ends and ssh key login without
@@ -31,12 +31,14 @@
 # 1.4 Allow limiting full backups count.
 # 1.5 Fix 'last_ok_inc_backup' not saved to last_data file if backup fails.
 #     Make rsync to retry after 60s and increase rsync retry count.
+# 1.6 Reorganize code.
 
 # show help if requested or no args
 if [ "$1" = '-h' ] || [ "$1" = '--help' ]
 then
-    echo "Make incremental backup using hardlinks based on config in /opy/ibackupper.config."
+    echo "Make monthly full and daily incremental backup using hardlinks."
     echo "Optionally MySQL, MariaDB, Postgres backup and compressed log removal can be made."
+    echo "Reads config from /opt/ibackupper/ibackupper.conf."
     echo "Script must be executed by root."
     echo "Usage:"
     echo "       ibackupper.sh"
@@ -86,6 +88,9 @@ fi
 # Set application path
 ahome="/opt/ibackupper"
 
+# Set status data file
+status_f="${ahome}/last_data"
+
 # Load config
 if [ -r "${ahome}/ibackupper.conf" ]
 then
@@ -104,6 +109,21 @@ then
     exit 1
 fi
 
+# Load last backup info if present
+if [ -r "$status_f" ]
+then
+    # shellcheck source=/dev/null
+    . "$status_f"
+else
+     write_log WARNING "No previous backup info file"
+fi
+
+# Set remote directory name based on day of month
+r_backup_dir=day_of_month_$(date +%d)
+
+# Save status data
+echo "last_backup=${r_backup_dir}" > "$status_f"
+
 # Connection check
 # shellcheck disable=SC2029
 result=$(ssh -q -o BatchMode=yes -o ConnectTimeout=10 -l"${hostname}" -p"${ssh_port}" "$backup_server" "cd \"$r_basedir\"" 2>&1)
@@ -117,18 +137,6 @@ then
     fi
     exit 1
 fi
-
-# Load last backup info if present
-if [ -r "${ahome}/last_data" ]
-then
-    # shellcheck source=/dev/null
-    . "${ahome}/last_data"
-else
-     write_log WARNING "No previous backup info file"
-fi
-
-# Set remote directory name based on day of month
-r_backup_dir=day_of_month_$(date +%d)
 
 ### Incremental backups ###
 if [ ${#src[@]} -gt 0 ]
@@ -173,20 +181,19 @@ else
      write_log WARNING "No backup sources defined for rsync!"
 fi
 
-# Save data for next run
-echo "last_backup=${r_backup_dir}" > "${ahome}/last_data"
+# Save status data
 if [ $errors -eq 0 ]
 then
-    echo "last_ok_inc_backup=${r_backup_dir}" >> "${ahome}/last_data"
-    echo "last_inc_status=ok" >> "${ahome}/last_data"
+    echo "last_ok_inc_backup=${r_backup_dir}" >> "$status_f"
+    echo "last_inc_status=ok" >> "$status_f"
     write_log INFO "Incremental backup done"
 else
     # shellcheck disable=SC2154
     if [ ! -z "${last_ok_inc_backup+x}" ]
     then
-        echo "last_ok_inc_backup=${last_ok_inc_backup}" >> "${ahome}/last_data"
+        echo "last_ok_inc_backup=${last_ok_inc_backup}" >> "$status_f"
     fi
-    echo "last_inc_status=errors" >> "${ahome}/last_data"
+    echo "last_inc_status=errors" >> "$status_f"
     write_log WARNING "Incremental backup had errors"
     errors=0
 fi
@@ -206,10 +213,10 @@ then
 
     if [ $errors -eq 0 ]
     then
-        echo "last_log_status=ok" >> "${ahome}/last_data"
+        echo "last_log_status=ok" >> "$status_f"
         write_log INFO "Log backup done"
     else
-        echo "last_log_status=errors" >> "${ahome}/last_data"
+        echo "last_log_status=errors" >> "$status_f"
         write_log WARNING "Log backup had errors"
         errors=0
     fi
@@ -242,10 +249,10 @@ then
     done
     if [ $errors -eq 0 ]
     then
-        echo "last_mysql_status=ok" >> "${ahome}/last_data"
+        echo "last_mysql_status=ok" >> "$status_f"
         write_log INFO "mysql/mariadb backup done"
     else
-        echo "last_mysql_status=errors" >> "${ahome}/last_data"
+        echo "last_mysql_status=errors" >> "$status_f"
         write_log WARNING "mysql/mariadb backup had errors"
         errors=0
     fi
@@ -276,10 +283,10 @@ then
     done
     if [ $errors -eq 0 ]
     then
-        echo "last_postgresql_status=ok" >> "${ahome}/last_data"
+        echo "last_postgresql_status=ok" >> "$status_f"
         write_log INFO "postgresql backup done"
     else
-        echo "last_postgresql_status=errors" >> "${ahome}/last_data"
+        echo "last_postgresql_status=errors" >> "$status_f"
         write_log WARNING "postgresql backup had errors"
         errors=0
     fi
@@ -316,16 +323,16 @@ then
     if [ "$?" -ne 0 ]
     then
         write_log ERROR "Something went wrong with monthly full backup!"
-        echo "last_ok_full=${last_ok_full}" >> "${ahome}/last_data"
-        echo "last_full_status=errors" >> "${ahome}/last_data"
+        echo "last_ok_full=${last_ok_full}" >> "$status_f"
+        echo "last_full_status=errors" >> "$status_f"
     else
         write_log INFO "Full backup done"
-        echo "last_ok_full=${month_nr}" >> "${ahome}/last_data"
-        echo "last_full_status=ok" >> "${ahome}/last_data"
+        echo "last_ok_full=${month_nr}" >> "$status_f"
+        echo "last_full_status=ok" >> "$status_f"
     fi
 else
     write_log INFO "Full backup for this month already exists."
-    echo "last_ok_full=${last_ok_full}" >> "${ahome}/last_data"
+    echo "last_ok_full=${last_ok_full}" >> "$status_f"
 fi
 ### End of full backup ###
 
