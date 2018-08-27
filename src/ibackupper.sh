@@ -32,6 +32,7 @@
 # 1.5 Fix 'last_ok_inc_backup' not saved to last_data file if backup fails.
 #     Make rsync to retry after 60s and increase rsync retry count.
 # 1.6 Reorganize code.
+#     Add file creation timestamp to status file.
 
 # show help if requested or no args
 if [ "$1" = '-h' ] || [ "$1" = '--help' ]
@@ -122,7 +123,8 @@ fi
 r_backup_dir=day_of_month_$(date +%d)
 
 # Save status data
-echo "last_backup=${r_backup_dir}" > "$status_f"
+echo "timestamp=$(date +%s)" > "$status_f"
+echo "last_backup=${r_backup_dir}" >> "$status_f"
 
 # Connection check
 # shellcheck disable=SC2029
