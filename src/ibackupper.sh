@@ -124,7 +124,6 @@ r_backup_dir=day_of_month_$(date +%d)
 
 # Save status data
 echo "time_start=$(date +%s)" > "$status_f"
-echo "last_backup=${r_backup_dir}" >> "$status_f"
 
 # Connection check
 # shellcheck disable=SC2029
