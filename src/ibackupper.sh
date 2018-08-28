@@ -32,7 +32,7 @@
 # 1.5 Fix 'last_ok_inc_backup' not saved to last_data file if backup fails.
 #     Make rsync to retry after 60s and increase rsync retry count.
 # 1.6 Reorganize code.
-#     Add file creation timestamp to status file.
+#     Add backup start/stop timestamp to status file.
 
 # show help if requested or no args
 if [ "$1" = '-h' ] || [ "$1" = '--help' ]
@@ -123,7 +123,7 @@ fi
 r_backup_dir=day_of_month_$(date +%d)
 
 # Save status data
-echo "timestamp=$(date +%s)" > "$status_f"
+echo "time_start=$(date +%s)" > "$status_f"
 echo "last_backup=${r_backup_dir}" >> "$status_f"
 
 # Connection check
@@ -137,7 +137,11 @@ then
     else
         write_log ERROR "$backup_server returned \"${result}\"! Interrupting.."
     fi
+    echo "server_connection=errors" >> "$status_f"
+    echo "time_end=$(date +%s)" >> "$status_f"
     exit 1
+else
+    echo "server_connection=ok" >> "$status_f"
 fi
 
 ### Incremental backups ###
@@ -338,4 +342,5 @@ else
 fi
 ### End of full backup ###
 
+echo "time_end=$(date +%s)" >> "$status_f"
 exit
