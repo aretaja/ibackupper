@@ -338,7 +338,7 @@ then
         echo "last_full_status=ok" >> "$status_f"
     fi
 else
-    write_log INFO "Full backup for this month already exists."
+    write_log INFO "Full backup disabled or allready exists for this month"
     echo "last_ok_full=${last_ok_full}" >> "$status_f"
 fi
 ### End of full backup ###
