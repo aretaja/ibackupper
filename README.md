@@ -53,6 +53,7 @@ sudo ./install.sh
 ```
 sudo cp /opt/ibackupper/ibackupper.conf_example /opt/ibackupper/ibackupper.conf
 sudo vim /opt/ibackupper/ibackupper.conf
+sudo chmod 0600 /opt/ibackupper/ibackupper.conf
 ```
 #### Setup cron job for backup
 * Append to */etc/crontab*
