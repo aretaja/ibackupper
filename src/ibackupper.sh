@@ -2,7 +2,7 @@
 #
 # ibackupper.sh
 # Copyright 2018 by Marko Punnar <marko[AT]aretaja.org>
-# Version: 1.6
+# Version: 1.7
 #
 # Script to make incremental, SQL and file backups of your data to remote
 # target. Requires bash, rsync and cat on both ends and ssh key login without
@@ -33,6 +33,7 @@
 #     Make rsync to retry after 60s and increase rsync retry count.
 # 1.6 Reorganize code.
 #     Add backup start/stop timestamp to status file.
+# 1.7 Make fresh incremental backup without hardlinks on every 1 day of month.
 
 # show help if requested or no args
 if [ "$1" = '-h' ] || [ "$1" = '--help' ]
@@ -119,8 +120,10 @@ else
      write_log WARNING "No previous backup info file"
 fi
 
+month_nr=$(date +%m)
+day_nr=$(date +%d)
 # Set remote directory name based on day of month
-r_backup_dir=day_of_month_$(date +%d)
+r_backup_dir=day_of_month_${day_nr}
 
 # Save status data
 echo "time_start=$(date +%s)" > "$status_f"
@@ -166,7 +169,7 @@ then
         # Set hardlink destination to previous backup if exists
         link_dest=''
         # shellcheck disable=SC2154
-        if [ ! -z "${last_ok_inc_backup+x}" ]
+        if [ ! -z "${last_ok_inc_backup+x}" ] && [ "$day_nr" != 01 ]
         then
             link_dest="--link-dest=\"../${last_ok_inc_backup}\""
             write_log INFO "Set hardlink destination to \"../${last_ok_inc_backup}\""
@@ -299,7 +302,6 @@ fi
 ### End of DB backup ###
 
 ### Full backup ###
-month_nr=$(date +%m)
 # shellcheck disable=SC2154
 if [ "$full_backup" -eq 1 ] && [ "$last_ok_full" != "$month_nr" ]
 then
