@@ -2,7 +2,7 @@
 #
 # ibackupper.sh
 # Copyright 2018 by Marko Punnar <marko[AT]aretaja.org>
-# Version: 1.7
+# Version: 1.8
 #
 # Script to make incremental, SQL and file backups of your data to remote
 # target. Requires bash, rsync and cat on both ends and ssh key login without
@@ -34,6 +34,7 @@
 # 1.6 Reorganize code.
 #     Add backup start/stop timestamp to status file.
 # 1.7 Make fresh incremental backup without hardlinks on every 1 day of month.
+# 1.8 Show configured hostname in status file.
 
 # show help if requested or no args
 if [ "$1" = '-h' ] || [ "$1" = '--help' ]
@@ -127,6 +128,7 @@ r_backup_dir=day_of_month_${day_nr}
 
 # Save status data
 echo "time_start=$(date +%s)" > "$status_f"
+echo "hostname=${hostname}" > "$status_f"
 
 # Connection check
 # shellcheck disable=SC2029
