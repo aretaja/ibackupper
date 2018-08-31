@@ -81,6 +81,7 @@ sudo chmod 0600 /opt/ibackupper/ibackupper.conf
 * Example content:
 ```
 time_start=1535376270 # Backup start timestamp
+hostname=src # Configured ibackup hostname
 server_connection=ok|errors # Status of ssh connectivity to server
 last_ok_inc_backup=day_of_month_27 # Last inc backup without errors
 last_inc_status=ok|errors # Last inc backup status
