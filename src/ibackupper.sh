@@ -128,7 +128,7 @@ r_backup_dir=day_of_month_${day_nr}
 
 # Save status data
 echo "time_start=$(date +%s)" > "$status_f"
-echo "hostname=${hostname}" > "$status_f"
+echo "hostname=${hostname}" >> "$status_f"
 
 # Connection check
 # shellcheck disable=SC2029
