@@ -89,14 +89,9 @@ then
    exit 1
 fi
 
-# Set application path
-ahome="/opt/ibackupper"
-
-# Set lockfile
-lock_f="${ahome}/lock"
-
-# Set status data file
-status_f="${ahome}/last_data"
+ahome="/opt/ibackupper" # Application path
+lock_f="${ahome}/lock" # Lockfile
+status_f="${ahome}/last_data" # Status data file
 
 # Check for running backup (lockfile)
 if [ -e "$lock_f" ]
@@ -138,6 +133,9 @@ day_nr=$(date +%d)
 # Set remote directory name based on day of month
 r_backup_dir=day_of_month_${day_nr}
 
+# Set lockfile
+touch "$lock_f";
+
 # Save status data
 echo "time_start=$(date +%s)" > "$status_f"
 echo "hostname=${hostname}" >> "$status_f"
@@ -155,6 +153,7 @@ then
     fi
     echo "server_connection=errors" >> "$status_f"
     echo "time_end=$(date +%s)" >> "$status_f"
+    rm "$lock_f";
     exit 1
 else
     echo "server_connection=ok" >> "$status_f"
@@ -358,4 +357,5 @@ fi
 ### End of full backup ###
 
 echo "time_end=$(date +%s)" >> "$status_f"
+rm "$lock_f";
 exit
