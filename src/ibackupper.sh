@@ -2,7 +2,7 @@
 #
 # ibackupper.sh
 # Copyright 2018 by Marko Punnar <marko[AT]aretaja.org>
-# Version: 1.8
+# Version: 1.9
 #
 # Script to make incremental, SQL and file backups of your data to remote
 # target. Requires bash, rsync and cat on both ends and ssh key login without
@@ -35,6 +35,7 @@
 #     Add backup start/stop timestamp to status file.
 # 1.7 Make fresh incremental backup without hardlinks on every 1 day of month.
 # 1.8 Show configured hostname in status file.
+# 1.9 Implement lockfile (Prevent execution of multiple instances).
 
 # show help if requested or no args
 if [ "$1" = '-h' ] || [ "$1" = '--help' ]
@@ -91,8 +92,18 @@ fi
 # Set application path
 ahome="/opt/ibackupper"
 
+# Set lockfile
+lock_f="${ahome}/lock"
+
 # Set status data file
 status_f="${ahome}/last_data"
+
+# Check for running backup (lockfile)
+if [ -e "$lock_f" ]
+then
+    write_log ERROR "Previous backup is running (lockfile set). Interrupting.."
+    exit 1
+fi
 
 # Load config
 if [ -r "${ahome}/ibackupper.conf" ]
@@ -115,6 +126,7 @@ fi
 # Load last backup info if present
 if [ -r "$status_f" ]
 then
+    cp "$status_f" "${status_f}.prev"
     # shellcheck source=/dev/null
     . "$status_f"
 else
