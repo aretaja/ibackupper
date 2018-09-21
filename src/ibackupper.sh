@@ -2,7 +2,7 @@
 #
 # ibackupper.sh
 # Copyright 2018 by Marko Punnar <marko[AT]aretaja.org>
-# Version: 1.9
+# Version: 1.10
 #
 # Script to make incremental, SQL and file backups of your data to remote
 # target. Requires bash, rsync and cat on both ends and ssh key login without
@@ -36,12 +36,14 @@
 # 1.7 Make fresh incremental backup without hardlinks on every 1 day of month.
 # 1.8 Show configured hostname in status file.
 # 1.9 Implement lockfile (Prevent execution of multiple instances).
+# 1.10 Implement lockfile (Prevent execution of multiple instances).
 
 # show help if requested or no args
 if [ "$1" = '-h' ] || [ "$1" = '--help' ]
 then
     echo "Make monthly full and daily incremental backup using hardlinks."
-    echo "Optionally MySQL, MariaDB, Postgres backup and compressed log removal can be made."
+    echo "Optionally MySQL, MariaDB, Postgres, OpenLDAP backup"
+    echo "and compressed log removal can be made."
     echo "Reads config from /opt/ibackupper/ibackupper.conf."
     echo "Script must be executed by root."
     echo "Usage:"
@@ -203,7 +205,7 @@ else
 fi
 
 # Save status data
-if [ $errors -eq 0 ]
+if [ "$errors" -eq 0 ]
 then
     echo "last_ok_inc_backup=${r_backup_dir}" >> "$status_f"
     echo "last_inc_status=ok" >> "$status_f"
@@ -313,6 +315,46 @@ then
     fi
 fi
 ### End of DB backup ###
+
+### OpenLDAP backup ###
+if [ "$ldap" -eq 1 ]
+then
+    write_log INFO "Making openldap backup."
+    write_log INFO "Transferring slapd config ldif to $backup_server over ssh pipe. Console log follows:"
+    # shellcheck disable=SC2029
+    /usr/sbin/slapcat -v -n0 | gzip -c - | ssh -o BatchMode=yes -p"${ssh_port}" -l"${hostname}" "${backup_server}" "cat > \"${r_basedir}/${r_backup_dir}/ldap_config.ldif.gz\""
+
+    if [ "$?" -ne 0 ]
+    then
+        errors=1
+        write_log ERROR "Something went wrong with slapd config backup!"
+    else
+        write_log INFO "slapd config backup done"
+    fi
+
+    write_log INFO "Transferring slapd data ldif to $backup_server over ssh pipe. Console log follows:"
+    # shellcheck disable=SC2029
+    /usr/sbin/slapcat -v -n1 | gzip -c - | ssh -o BatchMode=yes -p"${ssh_port}" -l"${hostname}" "${backup_server}" "cat > \"${r_basedir}/${r_backup_dir}/ldap_data.ldif.gz\""
+
+    if [ "$?" -ne 0 ]
+    then
+        errors=1
+        write_log ERROR "Something went wrong with slapd data backup!"
+    else
+        write_log INFO "slapd data backup done"
+    fi
+
+    if [ $errors -eq 0 ]
+    then
+        echo "last_ldap_status=ok" >> "$status_f"
+        write_log INFO "openldap backup done"
+    else
+        echo "last_ldap_status=errors" >> "$status_f"
+        write_log WARNING "openldap backup had errors"
+        errors=0
+    fi
+fi
+### End of OpenLDAP backup ###
 
 ### Full backup ###
 # shellcheck disable=SC2154

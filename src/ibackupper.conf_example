@@ -47,6 +47,9 @@ postgresql=0 # (0|1)
 # list of DB-s to ignore separated by "|"
 p_ignore_db=""
 
+# Backup LDAP (slapd)
+ldap=0 # (0|1)
+
 # Make monthly full backups.
 full_backup=0 # (0|1)
 
