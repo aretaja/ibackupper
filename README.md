@@ -1,5 +1,5 @@
 # ibackupper
-Send incremental-, SQL-, file backups of your data and move compressed old logs to remote target, using rsync and ssh. Optionally create minimal chroot environment on remote target (script included). Requires tar, gzip, bash, rsync and cat on both ends and ssh key login without password to remote end. Must be executed as root.
+Send incremental, SQL, LDAP, file backups of your data and compressed old logs removal to remote target, using rsync and ssh. Optionally create minimal chroot environment on remote target (script included). Requires tar, gzip, bash, rsync and cat on both ends and ssh key login without password to remote end. Must be executed as root.
 
 ## Getting Started
 Installation on Debian
@@ -88,6 +88,7 @@ last_inc_status=ok|errors # Last inc backup status
 last_log_status=ok|errors # Last compressed log move status
 last_mysql_status=ok|errors # Last mysql backup status
 last_postgresql_status=ok|errors # Last postgresql backup status
+last_ldap_status=ok|errors # Last ldap backup status
 last_ok_full=08 # When last full backup was successfully done
 last_full_status=ok|errors # Last full backup status
 time_end=1535376270 # Backup end timestamp
