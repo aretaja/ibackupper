@@ -376,7 +376,7 @@ then
         done
         null="${null}true"
         # shellcheck disable=SC2029
-        ssh -o BatchMode=yes -p"${ssh_port}" -l"${hostname}" "${backup_server}" "eval \"$null\""
+        ssh -o BatchMode=yes -p"${ssh_port}" -l"${hostname}" "${backup_server}" "cd \"${r_basedir}\" && eval \"$null\""
     fi
     write_log INFO "Making full monthly backup. Console log follows:"
     # shellcheck disable=SC2029
