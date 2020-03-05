@@ -14,7 +14,7 @@ Lets name our source server as *src_srv* and backup server as *dst_srv* for clea
 ```
 sudo addgroup backuppers
 ```
-#### Create user *dst_srv* with homedir located in your backup directory
+#### Create user *src_srv* with homedir located in your backup directory
 ```
 sudo adduser src_srv --shell /bin/bash --home /backupstorage/src_srv --disabled-password
 sudo adduser src_srv backuppers
