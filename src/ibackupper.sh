@@ -2,7 +2,7 @@
 #
 # ibackupper.sh
 # Copyright 2018-2020 by Marko Punnar <marko[AT]aretaja.org>
-# Version: 1.11
+# Version: 1.12
 #
 # Script to make incremental, SQL and file backups of your data to remote
 # target. Requires bash, rsync and cat on both ends and ssh key login without
@@ -41,6 +41,7 @@
 #      Fix error if $ldap variable is missing from config file.
 #      Fix backup marked as success if mysql login fails.
 #      Check exit code directly instead of indirect check with $?
+# 1.12 Fix incorrect conditionals statements introduced in previous version.
 
 # show help if requested or no args
 if [ "$1" = '-h' ] || [ "$1" = '--help' ]
@@ -151,6 +152,8 @@ echo "hostname=${hostname}" >> "$status_f"
 
 if result=$(ssh -q -o BatchMode=yes -o ConnectTimeout=10 -l"${hostname}" -p"${ssh_port}" "$backup_server" "cd \"$r_basedir\"" 2>&1)
 then
+    echo "server_connection=ok" >> "$status_f"
+else
     if [ -z "$result" ]
     then
         write_log ERROR "$backup_server is not reachable! Interrupting.."
@@ -161,8 +164,6 @@ then
     echo "time_end=$(date +%s)" >> "$status_f"
     rm "$lock_f";
     exit 1
-else
-    echo "server_connection=ok" >> "$status_f"
 fi
 
 ### Incremental backups ###
@@ -272,10 +273,10 @@ then
         # shellcheck disable=SC2029
         if mysqldump --single-transaction --events --triggers --add-drop-database --flush-logs "$d" | gzip -c - | ssh -o BatchMode=yes -p"${ssh_port}" -l"${hostname}" "${backup_server}" "cat > \"${r_basedir}/${r_backup_dir}/mysql_db_${d}.sql.gz\""
         then
+            write_log INFO "$d backup done"
+        else
             errors=1
             write_log ERROR "Something went wrong with $d backup!"
-        else
-            write_log INFO "$d backup done"
         fi
     done
 
@@ -331,20 +332,20 @@ then
     # shellcheck disable=SC2029
     if /usr/sbin/slapcat -v -n0 | gzip -c - | ssh -o BatchMode=yes -p"${ssh_port}" -l"${hostname}" "${backup_server}" "cat > \"${r_basedir}/${r_backup_dir}/ldap_config.ldif.gz\""
     then
+        write_log INFO "slapd config backup done"
+    else
         errors=1
         write_log ERROR "Something went wrong with slapd config backup!"
-    else
-        write_log INFO "slapd config backup done"
     fi
 
     write_log INFO "Transferring slapd data ldif to $backup_server over ssh pipe. Console log follows:"
     # shellcheck disable=SC2029
     if /usr/sbin/slapcat -v -n1 | gzip -c - | ssh -o BatchMode=yes -p"${ssh_port}" -l"${hostname}" "${backup_server}" "cat > \"${r_basedir}/${r_backup_dir}/ldap_data.ldif.gz\""
     then
+        write_log INFO "slapd data backup done"
+    else
         errors=1
         write_log ERROR "Something went wrong with slapd data backup!"
-    else
-        write_log INFO "slapd data backup done"
     fi
 
     if [ "$errors" -eq 0 ]
@@ -385,13 +386,13 @@ then
     # shellcheck disable=SC2029
     if ssh -o BatchMode=yes -p"${ssh_port}" -l"${hostname}" "${backup_server}" "tar -C \"${r_basedir}\" -cf - \"${r_backup_dir}\" | gzip -c >\"${r_basedir}/fullbackup_month_${month_nr}.tgz\""
     then
-        write_log ERROR "Something went wrong with monthly full backup!"
-        echo "last_ok_full=${last_ok_full}" >> "$status_f"
-        echo "last_full_status=errors" >> "$status_f"
-    else
         write_log INFO "Full backup done"
         echo "last_ok_full=${month_nr}" >> "$status_f"
         echo "last_full_status=ok" >> "$status_f"
+    else
+        write_log ERROR "Something went wrong with monthly full backup!"
+        echo "last_ok_full=${last_ok_full}" >> "$status_f"
+        echo "last_full_status=errors" >> "$status_f"
     fi
 else
     write_log INFO "Full backup disabled or allready exists for this month"
