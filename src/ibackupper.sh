@@ -1,8 +1,8 @@
 #!/bin/bash
 #
 # ibackupper.sh
-# Copyright 2018 by Marko Punnar <marko[AT]aretaja.org>
-# Version: 1.10
+# Copyright 2018-2020 by Marko Punnar <marko[AT]aretaja.org>
+# Version: 1.11
 #
 # Script to make incremental, SQL and file backups of your data to remote
 # target. Requires bash, rsync and cat on both ends and ssh key login without
@@ -37,6 +37,10 @@
 # 1.8 Show configured hostname in status file.
 # 1.9 Implement lockfile (Prevent execution of multiple instances).
 # 1.10 Implement lockfile (Prevent execution of multiple instances).
+# 1.11 Include '.xz' compressed log files.
+#      Fix error if $ldap variable is missing from config file.
+#      Fix backup marked as success if mysql login fails.
+#      Check exit code directly instead of indirect check with $?
 
 # show help if requested or no args
 if [ "$1" = '-h' ] || [ "$1" = '--help' ]
@@ -144,8 +148,8 @@ echo "hostname=${hostname}" >> "$status_f"
 
 # Connection check
 # shellcheck disable=SC2029
-result=$(ssh -q -o BatchMode=yes -o ConnectTimeout=10 -l"${hostname}" -p"${ssh_port}" "$backup_server" "cd \"$r_basedir\"" 2>&1)
-if [ "$?" -ne 0 ]
+
+if result=$(ssh -q -o BatchMode=yes -o ConnectTimeout=10 -l"${hostname}" -p"${ssh_port}" "$backup_server" "cd \"$r_basedir\"" 2>&1)
 then
     if [ -z "$result" ]
     then
@@ -226,7 +230,7 @@ fi
 if [ "$logs" -eq 1 ]
 then
     source='/var/log'
-    includes='--include="*/" --include="*.gz" --include="*.bz2"'
+    includes='--include="*/" --include="*.gz" --include="*.bz2" --include="*.xz"'
     excludes='--exclude="*"'
     cmd="rsync -aHAXRh --remove-source-files --timeout=300 --stats --numeric-ids -M--fake-super -e 'ssh -o BatchMode=yes -p${ssh_port}' ${includes} ${excludes} ${source} ${hostname}@${backup_server}:${r_basedir}/${r_backup_dir}/"
 
@@ -234,7 +238,7 @@ then
     write_log INFO "Making ${source} backup. rsync log follows:"
     do_backup "$cmd"
 
-    if [ $errors -eq 0 ]
+    if [ "$errors" -eq 0 ]
     then
         echo "last_log_status=ok" >> "$status_f"
         write_log INFO "Log backup done"
@@ -256,13 +260,17 @@ then
     fi
 
     write_log INFO "Making mysql/mariadb backup."
-    for d in $(mysqlshow |grep -Pv "^\+|Databases|${m_ignore_db}" |cut -d' ' -f2)
+    if result=$(mysqlshow |grep -Pv "^\\+|Databases|${m_ignore_db}" |cut -d' ' -f2)
+    then
+        errors=1
+        write_log ERROR "Something went wrong mysql/mariadb backup!"
+    fi
+
+    for d in $result
     do
         write_log INFO "Transferring $d dump to $backup_server over ssh pipe. Console log follows:"
         # shellcheck disable=SC2029
-        mysqldump --single-transaction --events --triggers --add-drop-database --flush-logs "$d" | gzip -c - | ssh -o BatchMode=yes -p"${ssh_port}" -l"${hostname}" "${backup_server}" "cat > \"${r_basedir}/${r_backup_dir}/mysql_db_${d}.sql.gz\""
-
-        if [ "$?" -ne 0 ]
+        if mysqldump --single-transaction --events --triggers --add-drop-database --flush-logs "$d" | gzip -c - | ssh -o BatchMode=yes -p"${ssh_port}" -l"${hostname}" "${backup_server}" "cat > \"${r_basedir}/${r_backup_dir}/mysql_db_${d}.sql.gz\""
         then
             errors=1
             write_log ERROR "Something went wrong with $d backup!"
@@ -270,7 +278,8 @@ then
             write_log INFO "$d backup done"
         fi
     done
-    if [ $errors -eq 0 ]
+
+    if [ "$errors" -eq 0 ]
     then
         echo "last_mysql_status=ok" >> "$status_f"
         write_log INFO "mysql/mariadb backup done"
@@ -294,9 +303,7 @@ then
     do
         write_log INFO "Transferring $d dump to $backup_server over ssh pipe. Console log follows:"
         # shellcheck disable=SC2029
-        sudo -u postgres pg_dump "$d" | gzip -c - | ssh -o BatchMode=yes -p"${ssh_port}" -l"${hostname}" "${backup_server}" "cat > \"${r_basedir}/${r_backup_dir}/postgresql_db_${d}.sql.gz\""
-
-        if [ "$?" -ne 0 ]
+        if sudo -u postgres pg_dump "$d" | gzip -c - | ssh -o BatchMode=yes -p"${ssh_port}" -l"${hostname}" "${backup_server}" "cat > \"${r_basedir}/${r_backup_dir}/postgresql_db_${d}.sql.gz\""
         then
             errors=1
             write_log ERROR "Something went wrong with $d backup!"
@@ -304,7 +311,7 @@ then
             write_log INFO "$d backup done"
         fi
     done
-    if [ $errors -eq 0 ]
+    if [ "$errors" -eq 0 ]
     then
         echo "last_postgresql_status=ok" >> "$status_f"
         write_log INFO "postgresql backup done"
@@ -317,14 +324,12 @@ fi
 ### End of DB backup ###
 
 ### OpenLDAP backup ###
-if [ "$ldap" -eq 1 ]
+if [ ! -z "$ldap" ] && [ "$ldap" -eq 1 ]
 then
     write_log INFO "Making openldap backup."
     write_log INFO "Transferring slapd config ldif to $backup_server over ssh pipe. Console log follows:"
     # shellcheck disable=SC2029
-    /usr/sbin/slapcat -v -n0 | gzip -c - | ssh -o BatchMode=yes -p"${ssh_port}" -l"${hostname}" "${backup_server}" "cat > \"${r_basedir}/${r_backup_dir}/ldap_config.ldif.gz\""
-
-    if [ "$?" -ne 0 ]
+    if /usr/sbin/slapcat -v -n0 | gzip -c - | ssh -o BatchMode=yes -p"${ssh_port}" -l"${hostname}" "${backup_server}" "cat > \"${r_basedir}/${r_backup_dir}/ldap_config.ldif.gz\""
     then
         errors=1
         write_log ERROR "Something went wrong with slapd config backup!"
@@ -334,9 +339,7 @@ then
 
     write_log INFO "Transferring slapd data ldif to $backup_server over ssh pipe. Console log follows:"
     # shellcheck disable=SC2029
-    /usr/sbin/slapcat -v -n1 | gzip -c - | ssh -o BatchMode=yes -p"${ssh_port}" -l"${hostname}" "${backup_server}" "cat > \"${r_basedir}/${r_backup_dir}/ldap_data.ldif.gz\""
-
-    if [ "$?" -ne 0 ]
+    if /usr/sbin/slapcat -v -n1 | gzip -c - | ssh -o BatchMode=yes -p"${ssh_port}" -l"${hostname}" "${backup_server}" "cat > \"${r_basedir}/${r_backup_dir}/ldap_data.ldif.gz\""
     then
         errors=1
         write_log ERROR "Something went wrong with slapd data backup!"
@@ -344,7 +347,7 @@ then
         write_log INFO "slapd data backup done"
     fi
 
-    if [ $errors -eq 0 ]
+    if [ "$errors" -eq 0 ]
     then
         echo "last_ldap_status=ok" >> "$status_f"
         write_log INFO "openldap backup done"
@@ -380,9 +383,7 @@ then
     fi
     write_log INFO "Making full monthly backup. Console log follows:"
     # shellcheck disable=SC2029
-    ssh -o BatchMode=yes -p"${ssh_port}" -l"${hostname}" "${backup_server}" "tar -C \"${r_basedir}\" -cf - \"${r_backup_dir}\" | gzip -c >\"${r_basedir}/fullbackup_month_${month_nr}.tgz\""
-
-    if [ "$?" -ne 0 ]
+    if ssh -o BatchMode=yes -p"${ssh_port}" -l"${hostname}" "${backup_server}" "tar -C \"${r_basedir}\" -cf - \"${r_backup_dir}\" | gzip -c >\"${r_basedir}/fullbackup_month_${month_nr}.tgz\""
     then
         write_log ERROR "Something went wrong with monthly full backup!"
         echo "last_ok_full=${last_ok_full}" >> "$status_f"
