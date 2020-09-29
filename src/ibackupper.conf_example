@@ -21,7 +21,7 @@ exc[5]=''
 src[6]='/var/www/'
 exc[6]=''
 
-# Move compressed (*.gz|*.bz2) old logs from /var/log to backup server
+# Move compressed (*.gz|*.bz2|*.xz) old logs from /var/log to backup server
 
 logs=0 # (0|1)X
 

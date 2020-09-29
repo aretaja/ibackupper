@@ -2,7 +2,7 @@
 #
 # ibackupper.sh
 # Copyright 2018-2020 by Marko Punnar <marko[AT]aretaja.org>
-# Version: 1.12
+# Version: 1.13
 #
 # Script to make incremental, SQL and file backups of your data to remote
 # target. Requires bash, rsync and cat on both ends and ssh key login without
@@ -42,6 +42,7 @@
 #      Fix backup marked as success if mysql login fails.
 #      Check exit code directly instead of indirect check with $?
 # 1.12 Fix incorrect conditionals statements introduced in previous version.
+# 1.13 Fix false "backup failed" error on SQL backups.
 
 # show help if requested or no args
 if [ "$1" = '-h' ] || [ "$1" = '--help' ]
@@ -261,24 +262,25 @@ then
     fi
 
     write_log INFO "Making mysql/mariadb backup."
-    if result=$(mysqlshow |grep -Pv "^\\+|Databases|${m_ignore_db}" |cut -d' ' -f2)
+    if mysqlshow >/dev/null 2>&1
     then
+        result=$(mysqlshow |grep -Pv "^\\+|Databases|${m_ignore_db}" |cut -d' ' -f2)
+        for d in $result
+        do
+            write_log INFO "Transferring $d dump to $backup_server over ssh pipe. Console log follows:"
+            # shellcheck disable=SC2029
+            if mysqldump --single-transaction --events --triggers --add-drop-database --flush-logs "$d" | gzip -c - | ssh -o BatchMode=yes -p"${ssh_port}" -l"${hostname}" "${backup_server}" "cat > \"${r_basedir}/${r_backup_dir}/mysql_db_${d}.sql.gz\""
+            then
+                write_log INFO "$d backup done"
+            else
+                errors=1
+                write_log ERROR "Something went wrong with $d backup!"
+            fi
+        done
+    else
         errors=1
-        write_log ERROR "Something went wrong mysql/mariadb backup!"
+        write_log ERROR "mysql/mariadb backup error - DB connection failed"
     fi
-
-    for d in $result
-    do
-        write_log INFO "Transferring $d dump to $backup_server over ssh pipe. Console log follows:"
-        # shellcheck disable=SC2029
-        if mysqldump --single-transaction --events --triggers --add-drop-database --flush-logs "$d" | gzip -c - | ssh -o BatchMode=yes -p"${ssh_port}" -l"${hostname}" "${backup_server}" "cat > \"${r_basedir}/${r_backup_dir}/mysql_db_${d}.sql.gz\""
-        then
-            write_log INFO "$d backup done"
-        else
-            errors=1
-            write_log ERROR "Something went wrong with $d backup!"
-        fi
-    done
 
     if [ "$errors" -eq 0 ]
     then
@@ -306,12 +308,13 @@ then
         # shellcheck disable=SC2029
         if sudo -u postgres pg_dump "$d" | gzip -c - | ssh -o BatchMode=yes -p"${ssh_port}" -l"${hostname}" "${backup_server}" "cat > \"${r_basedir}/${r_backup_dir}/postgresql_db_${d}.sql.gz\""
         then
+            write_log INFO "$d backup done"
+        else
             errors=1
             write_log ERROR "Something went wrong with $d backup!"
-        else
-            write_log INFO "$d backup done"
         fi
     done
+
     if [ "$errors" -eq 0 ]
     then
         echo "last_postgresql_status=ok" >> "$status_f"
