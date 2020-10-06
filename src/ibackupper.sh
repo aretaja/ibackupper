@@ -2,7 +2,7 @@
 #
 # ibackupper.sh
 # Copyright 2018-2020 by Marko Punnar <marko[AT]aretaja.org>
-# Version: 1.13
+# Version: 1.14
 #
 # Script to make incremental, SQL and file backups of your data to remote
 # target. Requires bash, rsync and cat on both ends and ssh key login without
@@ -43,6 +43,7 @@
 #      Check exit code directly instead of indirect check with $?
 # 1.12 Fix incorrect conditionals statements introduced in previous version.
 # 1.13 Fix false "backup failed" error on SQL backups.
+# 1.14 Increase rsync timeout from 300 to 600 sek.
 
 # show help if requested or no args
 if [ "$1" = '-h' ] || [ "$1" = '--help' ]
@@ -199,7 +200,7 @@ then
         fi
 
         # Complete command
-        cmd="rsync -aHAXRch --timeout=300 --delete --stats --numeric-ids -M--fake-super -e 'ssh -o BatchMode=yes -p${ssh_port}' $link_dest ${excludes} ${src[$i]} ${hostname}@${backup_server}:${r_basedir}/${r_backup_dir}/"
+        cmd="rsync -aHAXRch --timeout=600 --delete --stats --numeric-ids -M--fake-super -e 'ssh -o BatchMode=yes -p${ssh_port}' $link_dest ${excludes} ${src[$i]} ${hostname}@${backup_server}:${r_basedir}/${r_backup_dir}/"
         write_log INFO "Command: ${cmd}"
 
         # Do backup
@@ -234,7 +235,7 @@ then
     source='/var/log'
     includes='--include="*/" --include="*.gz" --include="*.bz2" --include="*.xz"'
     excludes='--exclude="*"'
-    cmd="rsync -aHAXRh --remove-source-files --timeout=300 --stats --numeric-ids -M--fake-super -e 'ssh -o BatchMode=yes -p${ssh_port}' ${includes} ${excludes} ${source} ${hostname}@${backup_server}:${r_basedir}/${r_backup_dir}/"
+    cmd="rsync -aHAXRh --remove-source-files --timeout=600 --stats --numeric-ids -M--fake-super -e 'ssh -o BatchMode=yes -p${ssh_port}' ${includes} ${excludes} ${source} ${hostname}@${backup_server}:${r_basedir}/${r_backup_dir}/"
 
     # Do backup
     write_log INFO "Making ${source} backup. rsync log follows:"
