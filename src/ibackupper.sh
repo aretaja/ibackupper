@@ -270,7 +270,7 @@ then
         galera=$(mysql --skip-column-names --silent --raw -e "show status where Variable_name = 'wsrep_local_state_comment';" 2>/dev/null |cut -f2)
         if [ "$galera" == "Synced" ]
         then
-            mysql --skip-column-names --silent --raw -e "SET wsrep_desync = ON;"
+            mysql --skip-column-names --silent --raw -e "SET GLOBAL wsrep_desync = ON;"
         fi
 
         # Do backups
@@ -291,7 +291,7 @@ then
         # Sync node back to galera cluster if needed
         if [ "$galera" == "Synced" ]
         then
-            mysql --skip-column-names --silent --raw -e "SET wsrep_desync = OFF;"
+            mysql --skip-column-names --silent --raw -e "SET GLOBAL wsrep_desync = OFF;"
         fi
     else
         errors=1
