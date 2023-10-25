@@ -180,7 +180,7 @@ then
 
         # Check excludes
         excludes=' '
-        if [ ! -z "${exc[$i]+x}" ]
+        if [ -n "${exc[$i]+x}" ]
         then
             IFS=',' read -ra exarray <<< "${exc[$i]}"
             for e in "${exarray[@]}"
@@ -192,7 +192,7 @@ then
         # Set hardlink destination to previous backup if exists
         link_dest=''
         # shellcheck disable=SC2154
-        if [ ! -z "${last_ok_inc_backup+x}" ] && [ "$day_nr" != 01 ]
+        if [ -n "${last_ok_inc_backup+x}" ] && [ "$day_nr" != 01 ]
         then
             link_dest="--link-dest=\"../${last_ok_inc_backup}\""
             write_log INFO "Set hardlink destination to \"../${last_ok_inc_backup}\""
@@ -220,7 +220,7 @@ then
     write_log INFO "Incremental backup done"
 else
     # shellcheck disable=SC2154
-    if [ ! -z "${last_ok_inc_backup+x}" ]
+    if [ -n "${last_ok_inc_backup+x}" ]
     then
         echo "last_ok_inc_backup=${last_ok_inc_backup}" >> "$status_f"
     fi
@@ -344,7 +344,7 @@ fi
 ### End of DB backup ###
 
 ### OpenLDAP backup ###
-if [ ! -z "$ldap" ] && [ "$ldap" -eq 1 ]
+if [ -n "$ldap" ] && [ "$ldap" -eq 1 ]
 then
     write_log INFO "Making openldap backup."
     write_log INFO "Transferring slapd config ldif to $backup_server over ssh pipe. Console log follows:"
