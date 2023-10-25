@@ -1,8 +1,8 @@
 #!/bin/bash
 #
 # ibackupper.sh
-# Copyright 2018-2020 by Marko Punnar <marko[AT]aretaja.org>
-# Version: 1.14
+# Copyright 2018-2023 by Marko Punnar <marko[AT]aretaja.org>
+# Version: 1.15
 #
 # Script to make incremental, SQL and file backups of your data to remote
 # target. Requires bash, rsync and cat on both ends and ssh key login without
@@ -44,6 +44,7 @@
 # 1.12 Fix incorrect conditionals statements introduced in previous version.
 # 1.13 Fix false "backup failed" error on SQL backups.
 # 1.14 Increase rsync timeout from 300 to 600 sek.
+# 1.15 Desync node from galera cluster before mysql backup if needed
 
 # show help if requested or no args
 if [ "$1" = '-h' ] || [ "$1" = '--help' ]
@@ -254,7 +255,7 @@ fi
 ### End of move compressed logs ###
 
 ### DB backup ###
-# mysql
+# mysql/mariadb
 if [ "$mysql" -eq 1 ]
 then
     if [ -z "$m_ignore_db" ]
@@ -265,6 +266,14 @@ then
     write_log INFO "Making mysql/mariadb backup."
     if mysqlshow >/dev/null 2>&1
     then
+        # Desync node from galera cluster if needed
+        galera=$(mysql --skip-column-names --silent --raw -e "show status where Variable_name = 'wsrep_local_state_comment';" 2>/dev/null |cut -f2)
+        if [ "$galera" == "Synced" ]
+        then
+            mysql --skip-column-names --silent --raw -e "SET wsrep_desync = ON;"
+        fi
+
+        # Do backups
         result=$(mysqlshow |grep -Pv "^\\+|Databases|${m_ignore_db}" |cut -d' ' -f2)
         for d in $result
         do
@@ -278,6 +287,12 @@ then
                 write_log ERROR "Something went wrong with $d backup!"
             fi
         done
+
+        # Sync node back to galera cluster if needed
+        if [ "$galera" == "Synced" ]
+        then
+            mysql --skip-column-names --silent --raw -e "SET wsrep_desync = OFF;"
+        fi
     else
         errors=1
         write_log ERROR "mysql/mariadb backup error - DB connection failed"
